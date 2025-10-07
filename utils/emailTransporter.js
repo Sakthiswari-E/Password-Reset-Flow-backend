@@ -1,16 +1,24 @@
-import nodemailer from "nodemailer";
+// utils/emailTransporter.js
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-transporter.verify((err) => {
-  if (err) console.error(" SMTP error:", err);
-  else console.log(" Gmail SMTP ready");
-});
-
-export default transporter;
+export async function sendResetEmail(to, link) {
+  try {
+    await resend.emails.send({
+      from: process.env.EMAIL_FROM || "Support <onboarding@resend.dev>",
+      to,
+      subject: "Password Reset Request",
+      html: `
+        <p>Hello,</p>
+        <p>You requested a password reset.</p>
+        <p>Click <a href="${link}">here</a> to reset your password.</p>
+        <p>This link will expire in 15 minutes.</p>
+      `,
+    });
+    console.log(`📨 Resend email sent to ${to}`);
+  } catch (err) {
+    console.error("❌ Resend email error:", err);
+    throw err;
+  }
+}

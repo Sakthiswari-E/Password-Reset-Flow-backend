@@ -5,9 +5,9 @@ import fs from "fs";
 import path from "path";
 import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
-import nodemailer from "nodemailer";
 import cors from "cors";
 import { fileURLToPath } from "url";
+import { sendResetEmail } from "./utils/emailTransporter.js";
 
 // --- Fix __dirname for ES Modules ---
 const __filename = fileURLToPath(import.meta.url);
@@ -16,27 +16,27 @@ const __dirname = path.dirname(__filename);
 // --- Load .env ---
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-// --- Environment check ---
+// --- Environment info ---
 console.log("📦 ENV CHECK:", {
-  EMAIL_USER: process.env.EMAIL_USER,
-  EMAIL_PASS: process.env.EMAIL_PASS ? "✅ Loaded" : "❌ Missing",
   PORT: process.env.PORT,
+  RESEND_API_KEY: process.env.RESEND_API_KEY ? "✅ Loaded" : "❌ Missing",
+  EMAIL_FROM: process.env.EMAIL_FROM || "not set",
 });
 
 // --- Auto-detect environment ---
 const isProduction = process.env.NODE_ENV === "production";
 const FRONTEND_URL = isProduction
-  ? "https://passwordresetfloww.netlify.app" // live Netlify frontend
+  ? "https://passwordresetfloww.netlify.app"
   : process.env.FRONTEND_URL || "http://localhost:3000";
 
-console.log(" FRONTEND_URL:", FRONTEND_URL);
+console.log("🌐 FRONTEND_URL:", FRONTEND_URL);
 
 // --- Initialize Express ---
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Log all incoming requests
+// Log all incoming requests (for debugging)
 app.use((req, res, next) => {
   console.log("➡️", req.method, req.url);
   next();
@@ -68,31 +68,13 @@ if (!fs.existsSync(USERS_DB)) {
   console.log("✅ Seeded users.json with default user.");
 }
 
+// --- Helper functions ---
 function readUsers() {
   return JSON.parse(fs.readFileSync(USERS_DB));
 }
 function writeUsers(users) {
   fs.writeFileSync(USERS_DB, JSON.stringify(users, null, 2));
 }
-
-// --- Gmail SMTP Setup ---
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.error("❌ Missing EMAIL_USER or EMAIL_PASS in .env");
-  process.exit(1);
-}
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-transporter.verify((err, success) => {
-  if (err) console.error("❌ SMTP error:", err);
-  else console.log("✅ Gmail SMTP ready");
-});
 
 // --- Routes ---
 
@@ -123,15 +105,10 @@ app.post("/api/forgot-password", async (req, res) => {
       user.email
     )}`;
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || `"Support" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: "Password Reset Request",
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>
-             <p>This link expires in 15 minutes.</p>`,
-    });
+    // ✅ Send email using Resend
+    await sendResetEmail(user.email, resetLink);
 
-    console.log(`📧 Sent reset link to ${user.email}: ${resetLink}`);
+    console.log(`📧 Reset link sent to ${user.email}: ${resetLink}`);
     res.json({ message: "Reset link sent to your email." });
   } catch (err) {
     console.error("Forgot-password error:", err);
