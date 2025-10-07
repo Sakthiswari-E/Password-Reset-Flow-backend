@@ -1,0 +1,9 @@
+[
+  {
+    "id": "1",
+    "email": "elansakthiswari@gmail.com",
+    "passwordHash": "$2b$10$NHq6ZSVFFFbyQ6WkQuONmOn66xHVSRHueKPvF2qipzUBsavb9uD3O",
+    "resetToken": null,
+    "resetExpires": null
+  }
+]
