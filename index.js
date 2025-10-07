@@ -9,31 +9,40 @@ import nodemailer from "nodemailer";
 import cors from "cors";
 import { fileURLToPath } from "url";
 
-// ---  Fix __dirname for ES Modules ---
+// --- Fix __dirname for ES Modules ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---  Load .env (explicit path for Windows safety) ---
+// --- Load .env ---
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-// ---  Debug: Verify env variables loaded ---
-console.log(" ENV CHECK:", {
+// --- Environment check ---
+console.log("📦 ENV CHECK:", {
   EMAIL_USER: process.env.EMAIL_USER,
-  EMAIL_PASS: process.env.EMAIL_PASS ? " Loaded" : " Missing",
+  EMAIL_PASS: process.env.EMAIL_PASS ? "✅ Loaded" : "❌ Missing",
   PORT: process.env.PORT,
 });
 
+// --- Auto-detect environment ---
+const isProduction = process.env.NODE_ENV === "production";
+const FRONTEND_URL = isProduction
+  ? "https://passwordresetfloww.netlify.app" // live Netlify frontend
+  : process.env.FRONTEND_URL || "http://localhost:3000";
+
+console.log(" FRONTEND_URL:", FRONTEND_URL);
+
+// --- Initialize Express ---
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Debug logging middleware (log every request)
+// Log all incoming requests
 app.use((req, res, next) => {
   console.log("➡️", req.method, req.url);
   next();
 });
 
-// --- Simple JSON "DB" ---
+// --- Simple JSON Database (for demo) ---
 const DB_DIR = path.join(__dirname, "db");
 const USERS_DB = path.join(DB_DIR, "users.json");
 
@@ -56,7 +65,7 @@ if (!fs.existsSync(USERS_DB)) {
       2
     )
   );
-  console.log("Seeded users.json with a default user.");
+  console.log("✅ Seeded users.json with default user.");
 }
 
 function readUsers() {
@@ -66,9 +75,9 @@ function writeUsers(users) {
   fs.writeFileSync(USERS_DB, JSON.stringify(users, null, 2));
 }
 
-// ---  Gmail transporter (check credentials) ---
+// --- Gmail SMTP Setup ---
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.error(" Missing EMAIL_USER or EMAIL_PASS in .env");
+  console.error("❌ Missing EMAIL_USER or EMAIL_PASS in .env");
   process.exit(1);
 }
 
@@ -80,18 +89,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Verify SMTP on startup
 transporter.verify((err, success) => {
-  if (err) {
-    console.error(" SMTP error:", err);
-  } else {
-    console.log("Gmail SMTP ready");
-  }
+  if (err) console.error("❌ SMTP error:", err);
+  else console.log("✅ Gmail SMTP ready");
 });
 
 // --- Routes ---
 
-// Forgot Password
+// 🔹 Forgot Password
 app.post("/api/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -114,9 +119,9 @@ app.post("/api/forgot-password", async (req, res) => {
     user.resetExpires = Date.now() + 15 * 60 * 1000; // 15 min
     writeUsers(users);
 
-    const resetLink = `${
-      process.env.FRONTEND_URL
-    }/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+    const resetLink = `${FRONTEND_URL}/reset-password?token=${token}&email=${encodeURIComponent(
+      user.email
+    )}`;
 
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || `"Support" <${process.env.EMAIL_USER}>`,
@@ -126,15 +131,15 @@ app.post("/api/forgot-password", async (req, res) => {
              <p>This link expires in 15 minutes.</p>`,
     });
 
-    console.log(`Sent reset link to ${user.email}: ${resetLink}`);
-    res.json({ message: " Reset link sent to your email." });
+    console.log(`📧 Sent reset link to ${user.email}: ${resetLink}`);
+    res.json({ message: "Reset link sent to your email." });
   } catch (err) {
-    console.error(" Forgot-password error:", err);
+    console.error("Forgot-password error:", err);
     res.status(500).json({ message: "Failed to send reset email" });
   }
 });
 
-// Verify Token
+// 🔹 Verify Token
 app.post("/api/verify-token", (req, res) => {
   const { email, token } = req.body;
   const users = readUsers();
@@ -145,7 +150,7 @@ app.post("/api/verify-token", (req, res) => {
   res.json({ message: "Token valid" });
 });
 
-// Reset Password
+// 🔹 Reset Password
 app.post("/api/reset-password", async (req, res) => {
   try {
     const { email, token, password } = req.body;
@@ -163,22 +168,19 @@ app.post("/api/reset-password", async (req, res) => {
     user.resetExpires = null;
     writeUsers(users);
 
-    console.log(` Password reset for ${user.email}`);
-    res.json({ message: " Password updated successfully" });
+    console.log(`🔒 Password reset for ${user.email}`);
+    res.json({ message: "Password updated successfully" });
   } catch (err) {
-    console.error(" Reset-password error:", err);
+    console.error("Reset-password error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// Health check route
-app.get("/ping", (req, res) => {
-  console.log(" /ping was called");
-  res.json({ message: "pong" });
-});
+// 🔹 Health check
+app.get("/ping", (req, res) => res.json({ message: "pong" }));
 
 // --- Start server ---
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(` Backend running on port ${PORT}`);
+  console.log(`🚀 Backend running on port ${PORT}`);
 });

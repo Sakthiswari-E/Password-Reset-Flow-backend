@@ -3,7 +3,7 @@
     "id": "1",
     "email": "elansakthiswari@gmail.com",
     "passwordHash": "$2b$10$NHq6ZSVFFFbyQ6WkQuONmOn66xHVSRHueKPvF2qipzUBsavb9uD3O",
-    "resetToken": null,
-    "resetExpires": null
+    "resetToken": "d8ed1dbd-64e7-45fc-a5ed-715cec127aff",
+    "resetExpires": 1759825194076
   }
 ]
